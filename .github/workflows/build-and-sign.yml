@@ -66,16 +66,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Generate SBOM
-        id: sbom
-        uses: anchore/sbom-action@v0
+      - name: Generate SBOM with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
         with:
-          image: "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
-          format: "spdx-json"
-          output-file: "sbom.spdx.json"
-          scope: squashed
+          image-ref: "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
+          format: 'spdx-json'
+          output: 'sbom.spdx.json'
+          scanners: 'vuln,secret,config'
+          sbom-sources: 'os,pip'
 
-      - name: Sign the image with Cosign (Keyless)
+      - name: Sign the image with Cosign
         run: |
           cosign sign --yes -a "branch=${{ github.ref_name }}" \
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
@@ -86,7 +86,7 @@ jobs:
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
       
       - name: Generate SLSA Provenance Attestation (GitHub's official way)
-        uses: actions/attest-build-provenance@v1 # Usiamo la v1 stabile
+        uses: actions/attest-build-provenance@v1 
         with:
           subject-name: ${{ needs.build-and-push.outputs.image_name }}
           subject-digest: ${{ needs.build-and-push.outputs.image_digest }}
