@@ -72,7 +72,7 @@ jobs:
 
       - name: Generate SLSA Provenance
         id: slsa
-        uses: slsa-framework/slsa-generator@v2
+        uses: slsa-project/slsa-github-generator@v2.0.0
         # Non servono 'with' parameters! 
         # L'action rileva automaticamente l'immagine dal job precedente.
 
@@ -90,3 +90,4 @@ jobs:
         run: |
           cosign attest --yes --keyless --predicate ${{ steps.slsa.outputs.provenance-path }} --type slsa \
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
+
