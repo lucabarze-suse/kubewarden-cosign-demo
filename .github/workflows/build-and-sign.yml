@@ -72,6 +72,7 @@ jobs:
           image-ref: "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
           format: 'spdx-json'
           output: 'sbom.spdx.json'
+          scanners: 'sbom'
           sbom-sources: 'os,pip'
 
       - name: Sign the image with Cosign
