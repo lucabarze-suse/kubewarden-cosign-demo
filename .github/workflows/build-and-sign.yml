@@ -92,6 +92,6 @@ jobs:
         with:
           subject-name: ${{ needs.build-and-push.outputs.image_name }}
           subject-digest: ${{ needs.build-and-push.outputs.image_digest }}
-          predicate-file: sbom.spdx.json
+          predicate-path: sbom.spdx.json
           predicate-type: spdxjson
           push-to-registry: true
