@@ -91,6 +91,14 @@ jobs:
         with:
           subject-name: ${{ needs.build-and-push.outputs.image_name }}
           subject-digest: ${{ needs.build-and-push.outputs.image_digest }}
-          push-to-registry: true
-          predicate-file: "sbom.spdx.json"
-          predicate-type: "spdxjson"
+          push-to-registry: false
+          
+      - name: Attest the SBOM with Cosign
+        run: |
+          cosign attest --yes --predicate sbom.spdx.json --type spdxjson \
+            "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
+
+      - name: Attest the SLSA Provenance with Cosign
+        run: |
+          cosign attest --yes --predicate ${{ steps.slsa.outputs.predicate-path }} --type "https://slsa.dev/provenance/v1" \
+            "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
