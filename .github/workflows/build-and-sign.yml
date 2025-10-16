@@ -5,6 +5,12 @@ on:
     branches: [ "main", "dev" ]
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: write
+  packages: write
+  actions: read
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
