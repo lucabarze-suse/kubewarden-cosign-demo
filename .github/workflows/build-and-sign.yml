@@ -47,38 +47,32 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # Job dedicato a chiamare il reusable workflow di SLSA, che genera e attesta la provenienza
-  generate-provenance:
-    needs: [build-and-push]
-    permissions:
-      actions: read
-      id-token: write
-      contents: write
-    uses: slsa-project/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.0.0
-    with:
-      # L'input corretto è 'image', che vuole nome E digest
-      image: ghcr.io/${{ github.repository }}@${{ needs.build-and-push.outputs.image_digest }}
-      # Questo workflow SLSA firma e attesta automaticamente la provenienza
-
-  # Job finale per firmare l'immagine e attestare l'SBOM
-  sign-and-attest-sbom:
+  attest:
     needs: [build-and-push]
     runs-on: ubuntu-latest
     permissions:
-      packages: write # Per scrivere firma e attestazioni SBOM nel registry
-      id-token: write # Per firmare con Cosign
-      contents: read
+      id-token: write     # Per la firma OIDC con Sigstore
+      packages: write     # Per scrivere firma e attestazioni nel registry
+      contents: read      # Per leggere il codice sorgente
 
     steps:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
       - name: Generate SBOM
+        id: sbom
         uses: anchore/sbom-action@v0
         with:
           image: "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
           format: "spdx-json"
           output-file: "sbom.spdx.json"
+
+      # Questo è lo step che risolve il problema. Chiama l'action direttamente.
+      - name: Generate SLSA Provenance
+        id: slsa
+        uses: slsa-framework/slsa-github-generator/actions/container@v2.0.0
+        with:
+          image-digest: ${{ needs.build-and-push.outputs.image_digest }}
 
       - name: Sign the image with Cosign (Keyless)
         run: |
@@ -88,5 +82,11 @@ jobs:
       - name: Attest the SBOM with Cosign
         run: |
           cosign attest --yes --keyless --predicate sbom.spdx.json --type spdxjson \
+            "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
+      
+      # Attesta la provenienza generata dallo step SLSA
+      - name: Attest the SLSA Provenance with Cosign
+        run: |
+          cosign attest --yes --keyless --predicate ${{ steps.slsa.outputs.provenance-path }} --type slsa \
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
 
