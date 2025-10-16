@@ -58,7 +58,7 @@ jobs:
     steps:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
-        
+      
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -67,12 +67,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Generate SBOM with Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
           format: 'spdx-json'
           output: 'sbom.spdx.json'
-          scanners: 'vuln,secret,config'
           sbom-sources: 'os,pip'
 
       - name: Sign the image with Cosign
@@ -82,13 +81,13 @@ jobs:
 
       - name: Attest the SBOM with Cosign
         run: |
+          set -e
           cosign attest --yes --predicate sbom.spdx.json --type spdxjson \
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
       
-      - name: Generate SLSA Provenance Attestation (GitHub's official way)
-        uses: actions/attest-build-provenance@v1 
+      - name: Generate SLSA Provenance Attestation
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ needs.build-and-push.outputs.image_name }}
           subject-digest: ${{ needs.build-and-push.outputs.image_digest }}
           push-to-registry: true
-
