@@ -51,10 +51,10 @@ jobs:
     needs: [build-and-push]
     runs-on: ubuntu-latest
     permissions:
-      id-token: write     # Per la firma OIDC con Sigstore
-      packages: write     # Per scrivere firma e attestazioni nel registry
-      contents: read      # Per leggere il codice sorgente
-      actions: read       # Necessario per l'action SLSA
+      id-token: write
+      packages: write
+      contents: read
+      actions: read
 
     steps:
       - name: Install Cosign
