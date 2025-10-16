@@ -61,8 +61,8 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Install Syft
-        uses: anchore/syft-action@v0
+      - name: Install SBOM
+        uses: anchore/sbom-action@v0
         with:
           image: ${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}
           format: spdx-json
@@ -85,7 +85,7 @@ jobs:
       contents: write
       actions: read
       
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.9.0
+    uses: slsa-framework/slsa-generator@v2
     with:
       base64-subjects: "${{ needs.build-and-push.outputs.image_digest }}"
       provenance-name: "pod-info-py.provenance"
