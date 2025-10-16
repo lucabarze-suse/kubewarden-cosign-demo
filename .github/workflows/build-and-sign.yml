@@ -80,18 +80,14 @@ jobs:
           cosign sign --yes -a "branch=${{ github.ref_name }}" \
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
 
-      - name: Generate and Attest SLSA Provenance
-        uses: actions/attest-build-provenance@v3
-        with:
-          subject-name: ${{ needs.build-and-push.outputs.image_name }}
-          subject-digest: ${{ needs.build-and-push.outputs.image_digest }}
-          push-to-registry: true
-
-      - name: Attest SBOM
-        uses: actions/attest@v3
-        with:
-          subject-name: ${{ needs.build-and-push.outputs.image_name }}
-          subject-digest: ${{ needs.build-and-push.outputs.image_digest }}
-          predicate-path: sbom.spdx.json
-          predicate-type: spdxjson
-          push-to-registry: true
+      - name: Attest with Cosign
+        run: |
+          cosign attest --yes \
+            --type slsaprovenance \
+            --predicate-type slsaprovenance \
+            "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
+            
+          cosign attest --yes \
+            --type spdxjson \
+            --predicate sbom.spdx.json \
+            "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
