@@ -68,13 +68,6 @@ jobs:
           format: "spdx-json"
           output-file: "sbom.spdx.json"
 
-      - name: Generate SLSA Provenance
-        id: slsa
-        uses: slsa-project/slsa-github-generator/actions/container@v2.0.0
-        with:
-          image-digest: ${{ needs.build-and-push.outputs.image_digest }}
-          image-repository: ${{ needs.build-and-push.outputs.image_name }}
-
       - name: Sign the image with Cosign (Keyless)
         run: |
           cosign sign --yes --keyless -a "branch=${{ github.ref_name }}" \
@@ -84,9 +77,13 @@ jobs:
         run: |
           cosign attest --yes --keyless --predicate sbom.spdx.json --type spdxjson \
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
-      
-      - name: Attest the SLSA Provenance with Cosign
-        run: |
-          cosign attest --yes --keyless --predicate ${{ steps.slsa.outputs.provenance-path }} --type slsa \
-            "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
 
+  generate-slsa:
+    needs: [build-and-push]
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.9.0
+    with:
+      base64-subjects: "${{ needs.build-and-push.outputs.image_digest }}"
+      provenance-name: "pod-info-py.provenance"
+    permissions:
+      id-token: write
+      contents: write
