@@ -5,14 +5,14 @@ on:
     branches: [ "main", "dev" ]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  packages: write
-  id-token: write # Necessario per la firma keyless con Sigstore
+permissions: read # Permessi di base a livello di workflow
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
     outputs:
       image_digest: ${{ steps.push.outputs.digest }}
       image_name: ghcr.io/${{ github.repository }}
@@ -49,32 +49,41 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  attest:
+  # Job dedicato a chiamare il reusable workflow di SLSA
+  generate-provenance:
     needs: [build-and-push]
+    permissions:
+      actions: read       # Per leggere il workflow
+      id-token: write     # Per la firma OIDC di SLSA
+      contents: write     # Per caricare la provenienza come release asset
+    uses: slsa-project/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.0.0
+    with:
+      # Nome dell'immagine senza tag/digest
+      image-repository: ${{ needs.build-and-push.outputs.image_name }}
+      # Digest dell'immagine buildata nel job precedente
+      image-digest: ${{ needs.build-and-push.outputs.image_digest }}
+      # Nome dell'artefatto di provenienza che verrà creato
+      provenance-name: ${{ needs.build-and-push.outputs.image_tag }}.provenance
+
+  # Job finale per firmare e attestare l'SBOM
+  sign-and-attest:
+    needs: [build-and-push, generate-provenance]
     runs-on: ubuntu-latest
     permissions:
-      actions: read   # Per leggere il workflow per SLSA
-      id-token: write # Per firmare con Sigstore
-      packages: write # Per scrivere le attestazioni nel registry
-      contents: write # Per caricare la provenienza come release asset (opzionale)
+      packages: write # Per scrivere firma e attestazioni nel registry
+      id-token: write # Per firmare con Cosign
+      contents: read
 
     steps:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
       - name: Generate SBOM
-        id: sbom
         uses: anchore/sbom-action@v0
         with:
           image: "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
           format: "spdx-json"
-          output-file: "sbom.spdx.json" # Specifica il nome del file di output
-
-      - name: Generate SLSA Provenance
-        id: slsa
-        uses: slsa-project/slsa-github-generator@v2.0.0
-        # Non servono 'with' parameters! 
-        # L'action rileva automaticamente l'immagine dal job precedente.
+          output-file: "sbom.spdx.json"
 
       - name: Sign the image with Cosign (Keyless)
         run: |
@@ -84,10 +93,5 @@ jobs:
       - name: Attest the SBOM with Cosign
         run: |
           cosign attest --yes --keyless --predicate sbom.spdx.json --type spdxjson \
-            "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
-      
-      - name: Attest the SLSA Provenance with Cosign
-        run: |
-          cosign attest --yes --keyless --predicate ${{ steps.slsa.outputs.provenance-path }} --type slsa \
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
 
