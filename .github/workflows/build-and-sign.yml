@@ -2,14 +2,14 @@ name: Build, Sign, and Attest Image
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: ["main", "dev"]
   workflow_dispatch:
 
+# Permessi minimi per le azioni che questo workflow esegue
 permissions:
   id-token: write
-  contents: write
+  contents: read
   packages: write
-  actions: read
 
 jobs:
   build-and-push:
@@ -60,7 +60,6 @@ jobs:
       id-token: write
       packages: write
       contents: read
-      actions: read
 
     steps:
       - name: Install Cosign
@@ -84,12 +83,18 @@ jobs:
           cosign attest --yes --keyless --predicate sbom.spdx.json --type spdxjson \
             "${{ needs.build-and-push.outputs.image_name }}@${{ needs.build-and-push.outputs.image_digest }}"
 
-  generate-slsa:
-    needs: [build-and-push]
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.9.0
-    with:
-      base64-subjects: "${{ needs.build-and-push.outputs.image_digest }}"
-      provenance-name: "pod-info-py.provenance"
-    permissions:
-      id-token: write
-      contents: write
+      - name: Dispatch generate-slsa workflow
+        if: ${{ success() && needs.build-and-push.outputs.image_digest != '' }}
+        env:
+          REPO: ${{ github.repository }}
+          WORKFLOW_FILE: generate-slsa.yml
+          IMAGE_DIGEST: ${{ needs.build-and-push.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Dispatching generate-slsa workflow for $IMAGE_NAME@$IMAGE_DIGEST"
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/$REPO/actions/workflows/$WORKFLOW_FILE/dispatches \
+            -d "{\"ref\":\"main\",\"inputs\":{\"image_digest\":\"$IMAGE_DIGEST\",\"image_name\":\"$IMAGE_NAME\"}}"
