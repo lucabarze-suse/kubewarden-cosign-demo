@@ -30,6 +30,7 @@ def pod_info():
     hostname, namespace, ip_address = get_pod_info()
 
     response_lines = [
+        "MALICIOUS ATTACKER IS CONTROLLING YOUR APP",
         "--- Pod Info ---",
         f"Hostname:\t{hostname}",
         f"Namespace:\t{namespace}",
