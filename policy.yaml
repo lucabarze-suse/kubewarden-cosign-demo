@@ -1,0 +1,21 @@
+apiVersion: policies.kubewarden.io/v1
+kind: AdmissionPolicy
+metadata:
+  name: enforce-signed-demo-images
+  namespace: default 
+spec:
+  policyServer: default 
+  module: registry://ghcr.io/kubewarden/policies/verify-image-signatures:v1.0.4 
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+    operations:
+    - CREATE
+  mutating: true
+  settings:
+    signatures:
+      - image: "*" 
+        keyless: 
+          - issuer: "https://github.com/login/oauth"
+            subject: "luca.barze@suse.com"
