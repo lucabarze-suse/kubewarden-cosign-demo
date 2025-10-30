@@ -12,7 +12,7 @@ A Kubewarden policy will **block** the deployment of the unsigned `:v1.1` image 
 
 ## Prerequisites
 
-* `cosign`
+* `cosign` (`v2`, `cosign v3` is not compatible as of now, 29/10/2025 with a big portion of the ecosystem because it changed how the keys are stored)
 * `kubectl`
 * `oras` CLI
 * Access to a Kubernetes cluster with Kubewarden installed (PolicyServer named `default`).
@@ -29,22 +29,18 @@ We assume the images are already pushed. The **crucial preparation step** alread
     ```bash
     # Adjust to your registry and repository
     export IMAGE_URI="ghcr.io/lucabarze-suse/kubewarden-cosign-demo"
-    # Adjust to your registry username if needed for verification tools
-    export REGISTRY_USER="lucabarze-suse" 
+    ```
     
 2.  **(DONE OFFLINE) Signing v1.0:**
+    ```bash
     # We need the exact digests for verification (replace with actual digests)
-    export DIGEST_V1_0="sha256:<digest-v1.0>" 
-    export DIGEST_V1_1="sha256:<digest-v1.1>" 
+    export DIGEST_V1_0=$(oras manifest fetch --descriptor "${IMAGE_URI}:v1.0" | jq -r .digest)
+    export DIGEST_V1_1=$(oras manifest fetch --descriptor "${IMAGE_URI}:v1.1" | jq -r .digest)
     ```
-    *Note: You can retrieve digests using `podman inspect ${IMAGE_URI}:<tag> --format '{{.Digest}}'` or `oras manifest fetch ${IMAGE_URI}:<tag> --descriptor | jq -r .digest` if you don't have them.*
-
     The following command was previously executed to sign the `v1.0` image:
     ```bash
-    # Command executed before the demo (DO NOT RUN LIVE):
-    # export COSIGN_PASSWORD=$CR_PAT 
-    # cosign sign --yes -u "$REGISTRY_USER" \
-    #   -a "creator=Your Name" -a "context=Demo Kubewarden" \
+    # Command executed before the demo:
+    # cosign sign --yes \
     #   "${IMAGE_URI}@${DIGEST_V1_0}" 
     ```
 
@@ -86,10 +82,6 @@ We assume the images are already pushed. The **crucial preparation step** alread
         ```bash
         # Ensure image URI in policy.yaml matches $IMAGE_URI
         kubectl apply -f policy.yaml
-        ```
-    * *(Optional) Wait for the policy to become active:*
-        ```bash
-        kubectl get admissionpolicy -n default enforce-signed-demo-images -w --output-condition=jsonpath='{.status.policyStatus}'=active
         ```
 
 4.  **Attempt to Deploy the Unsigned Pod (v1.1):**

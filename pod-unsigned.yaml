@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: demo-pod-signed
+  name: demo-pod-unsigned
   namespace: default
 spec:
   containers:
